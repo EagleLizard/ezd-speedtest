@@ -84,7 +84,7 @@ const XXX_BLOCKLIST: string[] = [
 
 const ALL_PING_TARGETS = [
   // ...DEFAULT_TARGETS,
-  ...ALEXA_GLOBAL,
+  // ...ALEXA_GLOBAL,
   ...ALEXA_US,
   ...ALEXA_MEXICO,
   ...ALEXA_CA,
@@ -94,21 +94,21 @@ const ALL_PING_TARGETS = [
   ...ALEXA_COSTA_RICA,
   ...ALEXA_PANAMA,
 
-  ...ALEXA_COLOMBIA,
-  ...ALEXA_VENEZUELA,
-  ...ALEXA_BOLIVIA,
-  ...ALEXA_CHILE,
-  ...ALEXA_BRAZIL,
+  // ...ALEXA_COLOMBIA,
+  // ...ALEXA_VENEZUELA,
+  // ...ALEXA_BOLIVIA,
+  // ...ALEXA_CHILE,
+  // ...ALEXA_BRAZIL,
 
-  ...ALEXA_UK,
-  ...ALEXA_FRANCE,
-  ...ALEXA_GERMANY,
+  // ...ALEXA_UK,
+  // ...ALEXA_FRANCE,
+  // ...ALEXA_GERMANY,
 
-  ...ALEXA_AU,
-  ...ALEXA_HK,
-  ...ALEXA_JP,
+  // ...ALEXA_AU,
+  // ...ALEXA_HK,
+  // ...ALEXA_JP,
 
-  ...ALEXA_CHINA,
+  // ...ALEXA_CHINA,
 ].filter(uri => {
   return !XXX_BLOCKLIST.some(xxxUri => {
     return uri.includes(xxxUri);
