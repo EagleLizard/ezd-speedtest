@@ -9,6 +9,18 @@ import {
   ALEXA_HK,
   ALEXA_CHINA,
   ALEXA_JP,
+  ALEXA_UK,
+  ALEXA_PUERTO_RICO,
+  ALEXA_GUATEMALA,
+  ALEXA_EL_SALVADOR,
+  ALEXA_PANAMA,
+  ALEXA_CHILE,
+  ALEXA_COSTA_RICA,
+  ALEXA_COLOMBIA,
+  ALEXA_VENEZUELA,
+  ALEXA_BOLIVIA,
+  ALEXA_FRANCE,
+  ALEXA_GERMANY,
 } from './alexa-addresses';
 
 const DEFAULT_TARGETS = [
@@ -61,24 +73,50 @@ const DEFAULT_TARGETS = [
   'www.ca.gov',
 ];
 
-const DEDUPED_PING_TARGETS = Array.from(new Set([
+const XXX_BLOCKLIST: string[] = [
+  // 'xvideos',
+  // 'xhamster',
+  // 'pornhub',
+  // 'chaturbate',
+  // 'xnxx',
+  // 'mileroticos',
+];
+
+const ALL_PING_TARGETS = [
   // ...DEFAULT_TARGETS,
   ...ALEXA_GLOBAL,
   ...ALEXA_US,
   ...ALEXA_MEXICO,
   ...ALEXA_CA,
-  // ...ALEXA_BRAZIL,
+  ...ALEXA_PUERTO_RICO,
+  ...ALEXA_GUATEMALA,
+  ...ALEXA_EL_SALVADOR,
+  ...ALEXA_COSTA_RICA,
+  ...ALEXA_PANAMA,
+
+  ...ALEXA_COLOMBIA,
+  ...ALEXA_VENEZUELA,
+  ...ALEXA_BOLIVIA,
+  ...ALEXA_CHILE,
+  ...ALEXA_BRAZIL,
+
+  ...ALEXA_UK,
+  ...ALEXA_FRANCE,
+  ...ALEXA_GERMANY,
 
   ...ALEXA_AU,
-
-  // ...ALEXA_HK,
+  ...ALEXA_HK,
   ...ALEXA_JP,
-  // ...ALEXA_CHINA,
-]));
+
+  ...ALEXA_CHINA,
+].filter(uri => {
+  return !XXX_BLOCKLIST.some(xxxUri => {
+    return uri.includes(xxxUri);
+  });
+});
+
+const DEDUPED_PING_TARGETS = Array.from(new Set(ALL_PING_TARGETS));
 
 export const PING_TARGETS = [
   ...DEDUPED_PING_TARGETS,
 ];
-
-console.log(PING_TARGETS.length);
-console.log(Array.from(new Set(PING_TARGETS)).length);

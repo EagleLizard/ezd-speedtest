@@ -13,7 +13,6 @@ import { pingMain } from './src/ping-main';
 })();
 
 async function main() {
-  console.log('hi');
   await pingMain();
 }
 

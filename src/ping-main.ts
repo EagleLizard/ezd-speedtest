@@ -1,165 +1,245 @@
 
 import * as _tcpPing from 'tcp-ping';
-import waitOn from 'wait-on';
+import * as math from 'mathjs';
+import _chance from 'chance';
+const chance = new _chance;
 
 import { PING_TARGETS } from './constants/constants';
-import { Timer } from './lib/timer';
 import { sleep } from './lib/sleep';
+import { Timer } from './lib/timer';
 import {
   aggregateTcpPingResults,
-  ping,
-  TcppErrorResult,
-  tcppHasError,
+  runPingLoop,
   TcpPingResultAggregate,
 } from './ping/ping';
+import {
+  runPingTest,
+} from './ping/ping-test';
+import {
+  getIntuitiveTimeStr,
+} from './lib/time-util';
+import {
+  AvgAccumulator,
+  getWeightedAverages, PRIMES, WeightedAverages,
+} from './lib/math-util';
 
-const MAX_PINGS = 50;
-const PING_STAGGER_MS = Math.round(PING_TARGETS.length * 0.5);
-// const PING_THROTTLE_MS = 25;
-const PING_THROTTLE_MS = 5;
+const DO_RUN_PING_TEST = true;
 
-console.log(`PING_STAGGER_MS: ${PING_STAGGER_MS}`);
+// const PER_PING_WAIT_MS = 1000;
 
-interface DoPingOpts {
-  attempts?: number;
-}
+// console.log(`PER_PING_WAIT_MS: ${PER_PING_WAIT_MS}`);
 
 export async function pingMain() {
-  let timer: Timer, deltaMs: number;
-  let pingResultAggregate: TcpPingResultAggregate;
-  let successfulPings: number, pingsPerSecond: number;
-  process.stderr.write('\n'.repeat(40));
-  timer = Timer.start();
-  // await doPingTest(PING_TARGETS, {
-  //   attempts: 1,
-  // });
-  pingResultAggregate = await runPingTest(PING_TARGETS);
-  deltaMs = timer.stop();
-  console.log(`\ntook: ${deltaMs} ms`);
-  successfulPings = pingResultAggregate.attempts - pingResultAggregate.failed;
-  pingsPerSecond = Math.round(successfulPings / (deltaMs / 1000));
-  console.log(`\n ${pingsPerSecond} pings/second`);
+  // await runPingTestHandler();
+  console.log(PING_TARGETS.length);
+  await pingForHandler(PING_TARGETS);
 }
 
-async function runPingTest(targets: string[]) {
-  let runPingPromises: Promise<void>[], pingCountMap: Record<string, number>;
-  let pingResults: _tcpPing.Result[], pingResultAggregate: TcpPingResultAggregate;
+async function pingForHandler(targets: string[]) {
+  let timer: Timer, deltaMs: number;
+  let pingResultAggregate: TcpPingResultAggregate, uriCountMap: Record<string, number>,
+    uriCountTuples: [ string, number ][], totalResultCount: number;
+  let uriCounts: number[], uriCountStdDev: number;
+  let successfulPings: number, pingsPerSecond: number;
+  let results: _tcpPing.Result[], resultsWindow: _tcpPing.Result[], pingForPromises: Promise<void>[];
+  let lastMs: number;
+  let minutes: number, seconds: number, ms: number;
 
-  runPingPromises = [];
-  pingResults = [];
-  pingCountMap = targets.reduce((acc, curr) => {
-    acc[curr] = 0;
-    return acc;
-  }, {} as Record<string, number>);
+  // const PER_PING_WAIT_MS = Math.round(3.43642612 * targets.length);
+  const PER_PING_WAIT_MS = Math.round(Math.E * targets.length);
+  // const PER_PING_WAIT_MS = Math.round(5 * targets.length);
+  // const PER_PING_WAIT_MS = 500;
 
-  process.stdout.write('\n');
-  for(let i = 0, currTarget: string; currTarget = targets[i], i < targets.length; ++i) {
-    let runPingPromise: Promise<void>;
-    runPingPromise = runPingLoop(currTarget, async (result) => {
-      let doStop: boolean;
-      pingResults.push(result);
-      doStop = ++pingCountMap[result.address] >= MAX_PINGS;
-      if((pingCountMap[result.address] % Math.round(MAX_PINGS / 6)) === 0) {
-        process.stdout.write('.');
-      }
+  console.log(`PER_PING_WAIT_MS: ${PER_PING_WAIT_MS}`);
 
-      for(let k = 0, tcpPingResults: _tcpPing.Results; tcpPingResults = result.results[k], k < result.results.length; ++k) {
-        let code: string, addr: string;
-        let tcppErrorResult: TcppErrorResult | undefined, waitOnOpts: waitOn.WaitOnOptions;
-        tcppErrorResult = tcppHasError(tcpPingResults);
-        if(tcppErrorResult) {
-          code = tcppErrorResult.code;
-          addr = `${result.address}:${tcppErrorResult.port}`;
-          process.stdout.write('x');
-          console.error(result.address);
-          console.error(tcppErrorResult.message);
-          console.error(tcppErrorResult.err);
-          console.error(`err.code - ${code}`);
-          if(
-            (code === 'EADDRNOTAVAIL')
-          ) {
-            console.error(`addr - ${addr}`);
-            // waitOnOpts = {
-            //   resources: [
-            //     addr,
-            //   ],
-            // };
-            // await waitOn(waitOnOpts);
-            // await sleep(50);
-          }
+  process.stderr.write('\n'.repeat(24));
+  minutes = 1.0;
+  minutes = 0.125;
+  minutes = 0.25;
+  minutes = 0.375;
+  minutes = 0.5;
+  minutes = 5.0;
+  minutes = 1.5;
+  seconds = minutes * 60;
+  ms = Math.round(seconds * 1000);
+  console.log(getIntuitiveTimeStr(ms));
 
-        }
-      }
-
-      // await sleep(PING_THROTTLE_MS);
-      if(doStop) {
-        process.stdout.write(`${pingCountMap[result.address]} `);
-        return true;
-      } else {
-        return false;
-      }
+  results = [];
+  resultsWindow = [];
+  pingForPromises = [];
+  uriCountMap = {};
+  lastMs = Date.now();
+  totalResultCount = 0;
+  const pingForCb = async (result: _tcpPing.Result): Promise<boolean> => {
+    totalResultCount++;
+    printByCount(totalResultCount);
+    const lastMsMax = 990;
+    const flopRange = Math.round(lastMsMax / 200);
+    const coinFlop = chance.integer({
+      min: -1 * flopRange,
+      max: flopRange,
     });
-    runPingPromises.push(runPingPromise);
-    await sleep(PING_STAGGER_MS);
+    if((Date.now() - lastMs) >= (lastMsMax + coinFlop)) {
+      lastMs = Date.now();
+      const currStamp = (+((timer.current() / 1000).toFixed(1)));
+      process.stdout.write(' ');
+      process.stdout.write(`${currStamp}`);
+      process.stdout.write(' ');
+      // console.log(aggregateTcpPingResults(resultsWindow));
+      resultsWindow.length = 0;
+    }
+    if(uriCountMap[result.address] === undefined) {
+      uriCountMap[result.address] = 0;
+    }
+    uriCountMap[result.address]++;
+    results.push(result);
+    resultsWindow.push(result);
+    await sleep(PER_PING_WAIT_MS);
+    return false;
+  };
+
+  timer = Timer.start();
+
+  for(let i = 0, currTarget: string; currTarget = targets[i], i < targets.length; ++i) {
+    let pingForPromise: Promise<void>;
+    pingForPromise = pingFor({
+      address: currTarget,
+      ms,
+    }, pingForCb);
+    pingForPromises.push(pingForPromise);
   }
 
-  await Promise.all(runPingPromises);
+  await Promise.all(pingForPromises);
   process.stdout.write('\n');
-  pingResultAggregate = aggregateTcpPingResults(pingResults);
+
+  deltaMs = timer.stop();
+  uriCountTuples = Object.entries(uriCountMap);
+  uriCountTuples.sort((a, b) => {
+    let aCount: number, bCount;
+    aCount = a[1];
+    bCount = b[1];
+    if(aCount > bCount) {
+      return -1;
+    }
+    if(aCount < bCount) {
+      return 1;
+    }
+    return 0;
+  });
+  console.log(uriCountTuples.length);
+  uriCountTuples.forEach(uriCountTuple => {
+    console.error(uriCountTuple);
+    // console.error(`${uriCountTuple[0]} => ${uriCountTuple[1]}`);
+  });
+  pingResultAggregate = aggregateTcpPingResults(results);
+  // console.error(uriCountTuples);
+  successfulPings = pingResultAggregate.attempts - pingResultAggregate.failed;
+  pingsPerSecond = Math.round(successfulPings / (deltaMs / 1000));
+
+  uriCounts = uriCountTuples.map(uriCountTuple => uriCountTuple[1]);
+  uriCountStdDev = math.std(uriCounts);
+
   console.log(pingResultAggregate);
-  return pingResultAggregate;
+  calculateAverages(results);
+
+  console.log(`\ntook: ${getIntuitiveTimeStr(deltaMs)}`);
+  console.log(`ping count diff (high - low) : ${uriCountTuples[0][1] - uriCountTuples[uriCountTuples.length - 1][1]}`);
+  console.log(`\n-- StdDev: ${uriCountStdDev.toFixed(1)}`);
+
+  console.log(`\n${pingsPerSecond} pings/second`);
 }
 
-async function runPing(address: string, cb: (result: _tcpPing.Result) => Promise<boolean>): Promise<void> {
-  let pingCount: number;
-  pingCount = 0;
+function printByCount(resultCount: number) {
+  // process.stdout.write('…');
+  // process.stdout.write('‥');
+  // process.stdout.write('․');
 
-  await runPingLoop(address, async (pingResult) => {
-    let doStop: boolean;
-    console.log(pingResult);
-    doStop = pingCount++ > 10;
+  if((resultCount % PRIMES[3]) === 0) {
+    process.stdout.write('⣀');
+  }
+  if((resultCount % PRIMES[6]) === 0) {
+    process.stdout.write('⣤');
+  }
+  if((resultCount % PRIMES[9]) === 0) {
+    process.stdout.write('⣶');
+  }
+  if((resultCount % PRIMES[12]) === 0) {
+    process.stdout.write('⣿');
+  }
+
+}
+
+function calculateAverages(results: _tcpPing.Result[]) {
+  let resultTimeTuples: [ string, number ][],
+    weightedAverages: WeightedAverages,
+    weightedAvgTuples: [ string, number, number ][],
+    percentWeightedTuples: [string, number, number][]
+  ;
+  let unWeightedAvg: number, averages: number[];
+  let totalCount: number;
+  resultTimeTuples = [];
+  results.forEach(result => {
+    result.results.forEach(results => {
+      if(results.err !== undefined) {
+        return;
+      }
+      resultTimeTuples.push([
+        result.address,
+        results.time,
+      ]);
+    });
+  });
+  weightedAverages = getWeightedAverages(resultTimeTuples);
+  weightedAvgTuples = [];
+  averages = Object.keys(weightedAverages).map(key => {
+    weightedAvgTuples.push([
+      key,
+      weightedAverages[key].avg,
+      weightedAverages[key].count,
+    ]);
+    return weightedAverages[key].avg;
+  });
+  totalCount = weightedAvgTuples.reduce((acc, curr) => {
+    return acc + curr[2];
+  }, 0);
+  // console.log(`totalCount: ${totalCount.toLocaleString()}`);
+  // weightedAvgTuples.forEach(weightedAvgTuple => {
+  //   console.error(weightedAvgTuple);
+  // });
+  unWeightedAvg = math.mean(averages);
+  console.log(`unWeightedAvg: ${unWeightedAvg.toFixed(2)}`);
+}
+
+interface PingForOpts {
+  address: string,
+  ms: number,
+}
+
+async function pingFor(opts: PingForOpts, cb: (result: _tcpPing.Result) => Promise<boolean>) {
+  let timer: Timer;
+  timer = Timer.start();
+  await runPingLoop(opts.address, async (result) => {
+    let doStop: boolean, cbDoStopResult: boolean;
+    cbDoStopResult = await cb(result);
+    doStop = cbDoStopResult || (timer.current() > opts.ms);
     return doStop;
   });
 }
 
-async function runPingLoop(address: string, cb: (result: _tcpPing.Result) => Promise<boolean>): Promise<void> {
-  let pingResult: _tcpPing.Result, doStop: boolean;
-  for(;;) {
-    pingResult = await ping({
-      address,
-      attempts: 1,
-    });
-    doStop = await cb(pingResult);
-    if(doStop) {
-      break;
-    }
+async function runPingTestHandler() {
+  let timer: Timer, deltaMs: number;
+  let pingResultAggregate: TcpPingResultAggregate;
+  let successfulPings: number, pingsPerSecond: number;
+  process.stderr.write('\n'.repeat(40));
+
+  timer = Timer.start();
+  if(DO_RUN_PING_TEST) {
+    pingResultAggregate = await runPingTest(PING_TARGETS);
   }
-}
+  deltaMs = timer.stop();
 
-async function doPingTest(pingTargets: string[], opts?: DoPingOpts) {
-  let tcpPingPromises: Promise<_tcpPing.Result>[], tcpPingResults: _tcpPing.Result[];
-  let resultAggregate: TcpPingResultAggregate;
-
-  opts = (opts === undefined) ? {} : opts;
-
-  tcpPingPromises = [];
-  process.stdout.write('\n');
-  for(let i = 0, currPingTarget: string; currPingTarget = pingTargets[i], i < pingTargets.length; ++i) {
-    let pingOpts: _tcpPing.Options, tcpPingPromise: Promise<_tcpPing.Result>;
-    pingOpts = {
-      address: currPingTarget,
-    };
-    if(opts?.attempts) {
-      pingOpts.attempts = opts.attempts;
-    }
-    tcpPingPromise = ping(pingOpts).then(res => {
-      process.stdout.write('.');
-      return res;
-    });
-    tcpPingPromises.push(tcpPingPromise);
-    await sleep(PING_STAGGER_MS);
-  }
-  tcpPingResults = await Promise.all(tcpPingPromises);
-  resultAggregate = aggregateTcpPingResults(tcpPingResults);
-  console.log(resultAggregate);
+  console.log(`\ntook: ${deltaMs} ms`);
+  successfulPings = pingResultAggregate.attempts - pingResultAggregate.failed;
+  pingsPerSecond = Math.round(successfulPings / (deltaMs / 1000));
+  console.log(`\n ${pingsPerSecond} pings/second`);
 }

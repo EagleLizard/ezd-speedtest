@@ -3,7 +3,11 @@ import sourceMapSupport from 'source-map-support';
 sourceMapSupport.install();
 
 import  * as _tcpPing from 'tcp-ping';
-import { sleep } from '../lib/sleep';
+import * as math from 'mathjs';
+
+import {
+  sleep,
+} from '../lib/sleep';
 
 let concurrentConnections = 0;
 
@@ -12,6 +16,7 @@ export interface TcpPingResultAggregate {
   avg: number;
   min: number;
   max: number;
+  median: number;
   timed_out: number;
   failed: number;
 }
@@ -19,8 +24,8 @@ export interface TcpPingResultAggregate {
 export function ping(pingOpts: _tcpPing.Options): Promise<_tcpPing.Result> {
   return new Promise((resolve, reject) => {
     (async () => {
-      while(concurrentConnections > 20) {
-        await sleep(0);
+      while(concurrentConnections > 25) {
+        await sleep(100);
       }
       concurrentConnections++;
       _tcpPing.ping(pingOpts, (err: unknown, data: _tcpPing.Result) => {
@@ -32,6 +37,20 @@ export function ping(pingOpts: _tcpPing.Options): Promise<_tcpPing.Result> {
       });
     })();
   });
+}
+
+export async function runPingLoop(address: string, cb: (result: _tcpPing.Result) => Promise<boolean>): Promise<void> {
+  let pingResult: _tcpPing.Result, doStop: boolean;
+  for(;;) {
+    pingResult = await ping({
+      address,
+      attempts: 1,
+    });
+    doStop = await cb(pingResult);
+    if(doStop) {
+      break;
+    }
+  }
 }
 
 export interface TcppErrorResult {
@@ -71,13 +90,15 @@ export function tcppHasError(tcppResults: _tcpPing.Results): TcppErrorResult | u
 export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpPingResultAggregate {
   let resultAggregate: TcpPingResultAggregate;
   let attempts: number, sum: number, min: number, max: number,
-    avg: number, timed_out: number, failed: number;
+    avg: number, median: number, timed_out: number, failed: number;
+  let timeVals: number[];
   attempts = 0;
   sum = 0;
   min = Infinity;
   max = -1;
   timed_out = 0;
   failed = 0;
+  timeVals = [];
   for(let i = 0, currResult: _tcpPing.Result; currResult = tcpPingResults[i], i < tcpPingResults.length; ++i) {
     // console.log(`\n${currResult.address}`);
     // try {
@@ -103,6 +124,7 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
         }
         continue;
       }
+      timeVals.push(currSeqResult.time);
       sum += currSeqResult.time;
       if(currSeqResult.time < min) {
         min = currSeqResult.time;
@@ -112,10 +134,12 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
       }
     }
   }
+  median = math.median(timeVals);
   avg = sum / attempts;
   resultAggregate = {
     attempts,
     avg,
+    median,
     max,
     min,
     timed_out,
