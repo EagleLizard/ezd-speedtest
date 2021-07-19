@@ -74,25 +74,31 @@ const DEFAULT_TARGETS = [
 ];
 
 const XXX_BLOCKLIST: string[] = [
-  // 'xvideos',
-  // 'xhamster',
-  // 'pornhub',
-  // 'chaturbate',
-  // 'xnxx',
-  // 'mileroticos',
+  'xvideos',
+  'xhamster',
+  'pornhub',
+  'chaturbate',
+  'xnxx',
+  'mileroticos',
+];
+const ECONNREFUSED_BLOCKLIST: string[] = [
+  'www.diario1.com',
+  'www.amazonaws.com',
 ];
 
 const ALL_PING_TARGETS = [
+
   // ...DEFAULT_TARGETS,
+
   // ...ALEXA_GLOBAL,
   ...ALEXA_US,
-  ...ALEXA_MEXICO,
-  ...ALEXA_CA,
-  ...ALEXA_PUERTO_RICO,
-  ...ALEXA_GUATEMALA,
-  ...ALEXA_EL_SALVADOR,
-  ...ALEXA_COSTA_RICA,
-  ...ALEXA_PANAMA,
+  // ...ALEXA_MEXICO,
+  // ...ALEXA_CA,
+  // ...ALEXA_PUERTO_RICO,
+  // ...ALEXA_GUATEMALA,
+  // ...ALEXA_EL_SALVADOR,
+  // ...ALEXA_COSTA_RICA,
+  // ...ALEXA_PANAMA,
 
   // ...ALEXA_COLOMBIA,
   // ...ALEXA_VENEZUELA,
@@ -109,8 +115,13 @@ const ALL_PING_TARGETS = [
   // ...ALEXA_JP,
 
   // ...ALEXA_CHINA,
+
 ].filter(uri => {
   return !XXX_BLOCKLIST.some(xxxUri => {
+    return uri.includes(xxxUri);
+  });
+}).filter(uri => {
+  return !ECONNREFUSED_BLOCKLIST.some(xxxUri => {
     return uri.includes(xxxUri);
   });
 });

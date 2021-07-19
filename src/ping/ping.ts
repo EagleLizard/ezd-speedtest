@@ -19,13 +19,23 @@ export interface TcpPingResultAggregate {
   median: number;
   timed_out: number;
   failed: number;
+  econnrefusedCount: number;
+  eaddrnotavailCount: number;
 }
+const CONCURRENT_CONNECTION_MAX = 50;
+const CONCURRENT_SLEEP_MS = 200;
+
+console.log(`CONCURRENT_CONNECTION_MAX: ${CONCURRENT_CONNECTION_MAX}`);
+console.log(`CONCURRENT_SLEEP_MS: ${CONCURRENT_SLEEP_MS}`);
+console.error('');
+console.error(`CONCURRENT_CONNECTION_MAX: ${CONCURRENT_CONNECTION_MAX}`);
+console.error(`CONCURRENT_SLEEP_MS: ${CONCURRENT_SLEEP_MS}`);
 
 export function ping(pingOpts: _tcpPing.Options): Promise<_tcpPing.Result> {
   return new Promise((resolve, reject) => {
     (async () => {
-      while(concurrentConnections > 25) {
-        await sleep(100);
+      while(concurrentConnections > CONCURRENT_CONNECTION_MAX) {
+        await sleep(CONCURRENT_SLEEP_MS);
       }
       concurrentConnections++;
       _tcpPing.ping(pingOpts, (err: unknown, data: _tcpPing.Result) => {
@@ -39,12 +49,23 @@ export function ping(pingOpts: _tcpPing.Options): Promise<_tcpPing.Result> {
   });
 }
 
+
 export async function runPingLoop(address: string, cb: (result: _tcpPing.Result) => Promise<boolean>): Promise<void> {
   let pingResult: _tcpPing.Result, doStop: boolean;
+  let port: number, portFlip: boolean;
+  portFlip = false;
   for(;;) {
+    port = portFlip ? 80 : 443;
+    portFlip = !portFlip;
+    /*
+      80
+      443
+    */
     pingResult = await ping({
       address,
       attempts: 1,
+      // port: 80,
+      port,
     });
     doStop = await cb(pingResult);
     if(doStop) {
@@ -90,7 +111,8 @@ export function tcppHasError(tcppResults: _tcpPing.Results): TcppErrorResult | u
 export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpPingResultAggregate {
   let resultAggregate: TcpPingResultAggregate;
   let attempts: number, sum: number, min: number, max: number,
-    avg: number, median: number, timed_out: number, failed: number;
+    avg: number, median: number, timed_out: number, failed: number,
+    econnrefusedCount: number, eaddrnotavailCount: number;
   let timeVals: number[];
   attempts = 0;
   sum = 0;
@@ -98,6 +120,8 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
   max = -1;
   timed_out = 0;
   failed = 0;
+  econnrefusedCount = 0;
+  eaddrnotavailCount = 0;
   timeVals = [];
   for(let i = 0, currResult: _tcpPing.Result; currResult = tcpPingResults[i], i < tcpPingResults.length; ++i) {
     // console.log(`\n${currResult.address}`);
@@ -113,9 +137,21 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
       attempts++;
       if(currSeqResult.err) {
         const error = new Error(`${currSeqResult.err.message} ${currResult.address}`);
-        console.error(error);
-        console.error(currResult);
-        console.error(currSeqResult.err);
+        if(
+          // currSeqResult.err.message.includes('timeout')
+          currSeqResult.err.message.includes('ECONNREFUSED')
+          // || currSeqResult.err.message.includes('ENOTFOUND')
+        ) {
+          // console.error(error);
+          console.error(currResult.address);
+          console.error(currSeqResult.err.message.split('\n')[0]);
+        }
+        if(currSeqResult.err.message.includes('ECONNREFUSED')) {
+          econnrefusedCount++;
+        }
+        if(currSeqResult.err.message.includes('EADDRNOTAVAIL')) {
+          eaddrnotavailCount++;
+        }
         // console.log(currSeqResult.err);
         if(currSeqResult.err.message.includes('timeout')) {
           timed_out++;
@@ -144,6 +180,8 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
     min,
     timed_out,
     failed,
+    econnrefusedCount,
+    eaddrnotavailCount,
   };
   return resultAggregate;
 }

@@ -9,35 +9,55 @@ import { aggregateTcpPingResults, runPingLoop, TcpPingResultAggregate } from './
 import { getIntuitiveTimeStr } from '../lib/time-util';
 import { sleep } from '../lib/sleep';
 
+// process.stderr.write('\n'.repeat(3));
+
 export async function pingForHandler(targets: string[]) {
   let timer: Timer, deltaMs: number;
   let pingResultAggregate: TcpPingResultAggregate, uriCountMap: Record<string, number>,
     uriCountTuples: [ string, number ][], totalResultCount: number;
-  let uriCounts: number[], uriCountStdDev: number;
+  let uriCounts: number[], uriCountStdDev: number, percentResultsFailed: number;
   let successfulPings: number, pingsPerSecond: number;
   let results: _tcpPing.Result[], resultsWindow: _tcpPing.Result[], pingForPromises: Promise<void>[];
   let lastMs: number;
   let minutes: number, seconds: number, ms: number;
+  targets = [
+    ...targets,
+    // ...targets,
+    // ...targets,
+    // ...targets,
+    // ...targets,
+    // ...targets,
+    // ...targets,
+    // ...targets,
+  ];
+  console.log(`num targets: ${targets.length}`);
+  console.error(`num targets: ${targets.length}`);
 
   // const PER_PING_WAIT_MS = Math.round(3.43642612 * targets.length);
-  const PER_PING_WAIT_MS = Math.round(Math.E * targets.length);
-  // const PER_PING_WAIT_MS = Math.round(5 * targets.length);
+  // const PER_PING_WAIT_MS = Math.round(Math.E * targets.length);
+  const PER_PING_WAIT_MS = Math.round(Math.E * (targets.length / 2));
+  // const PER_PING_WAIT_MS = Math.round(Math.LOG2E * targets.length);
+  // const PER_PING_WAIT_MS = Math.round(targets.length);
+  // const PER_PING_WAIT_MS = 100;
   // const PER_PING_WAIT_MS = 500;
 
   console.log(`PER_PING_WAIT_MS: ${PER_PING_WAIT_MS}`);
+  console.error(`PER_PING_WAIT_MS: ${PER_PING_WAIT_MS}`);
 
-  process.stderr.write('\n'.repeat(24));
-  minutes = 1.0;
-  minutes = 0.25;
+  // process.stderr.write('\n'.repeat(12));
   minutes = 0.375;
+  minutes = 0.125;
+  minutes = 30.0;
+  minutes = 1.0;
   minutes = 5.0;
   minutes = 10.0;
+  minutes = 0.25;
   minutes = 1.5;
-  minutes = 0.125;
   minutes = 0.5;
   seconds = minutes * 60;
   ms = Math.round(seconds * 1000);
   console.log(getIntuitiveTimeStr(ms));
+  console.error(getIntuitiveTimeStr(ms));
 
   results = [];
   resultsWindow = [];
@@ -49,7 +69,7 @@ export async function pingForHandler(targets: string[]) {
     totalResultCount++;
     printByCount(totalResultCount);
     const lastMsMax = 1000;
-    const flopRange = Math.round(lastMsMax / 200);
+    const flopRange = Math.round(lastMsMax / 10);
     const coinFlop = chance.integer({
       min: -1 * flopRange,
       max: flopRange,
@@ -102,7 +122,11 @@ export async function pingForHandler(targets: string[]) {
     return 0;
   });
   console.log(uriCountTuples.length);
-  uriCountTuples.forEach(uriCountTuple => {
+  [
+    ...uriCountTuples.slice(0, 6),
+    [],
+    ...uriCountTuples.slice(-6),
+  ].forEach(uriCountTuple => {
     console.error(uriCountTuple);
     // console.error(`${uriCountTuple[0]} => ${uriCountTuple[1]}`);
   });
@@ -113,15 +137,29 @@ export async function pingForHandler(targets: string[]) {
 
   uriCounts = uriCountTuples.map(uriCountTuple => uriCountTuple[1]);
   uriCountStdDev = math.std(uriCounts);
+  percentResultsFailed = (pingResultAggregate.failed / pingResultAggregate.attempts) * 100;
 
   console.log(pingResultAggregate);
   calculateAverages(results);
 
   console.log(`\ntook: ${getIntuitiveTimeStr(deltaMs)}`);
   console.log(`ping count diff (high - low) : ${uriCountTuples[0][1] - uriCountTuples[uriCountTuples.length - 1][1]}`);
-  console.log(`\n-- StdDev: ${uriCountStdDev.toFixed(1)}`);
 
+  const stdDevStr = `-- StdDev: ${uriCountStdDev.toFixed(1)}`;
+  const percentResultsFailedStr = `-- Failed:: ${percentResultsFailed.toFixed(1)} %`;
+  const econnrefusedCountStr = `-- econnrefused: ${pingResultAggregate.econnrefusedCount.toLocaleString()}`;
+  const eaddrnotavailCountStr = `-- eaddrnotavail: ${pingResultAggregate.eaddrnotavailCount.toLocaleString()}`;
+  console.log(`\n${stdDevStr}`);
+  console.log(percentResultsFailedStr);
+  console.log(econnrefusedCountStr);
+  console.log(eaddrnotavailCountStr);
   console.log(`\n${pingsPerSecond} pings/second`);
+
+  console.error(stdDevStr);
+  console.error(percentResultsFailedStr);
+  console.error(econnrefusedCountStr);
+  console.error(eaddrnotavailCountStr);
+  console.error(`\n${pingsPerSecond} pings/second`);
 }
 
 interface PingForOpts {
@@ -145,42 +183,46 @@ function printByCount(resultCount: number) {
   // process.stdout.write('‥');
   // process.stdout.write('․');
 
-  // if((resultCount % PRIMES[3]) === 0) {
+  let factor: number, iter: number;
+
+  iter = 0;
+
+  // if((resultCount % PRIMES[5]) === 0) {
   //   process.stdout.write('⣀');
   // }
-  // if((resultCount % PRIMES[6]) === 0) {
+  // if((resultCount % PRIMES[8]) === 0) {
   //   process.stdout.write('⣤');
   // }
-  // if((resultCount % PRIMES[9]) === 0) {
+  // if((resultCount % PRIMES[11]) === 0) {
   //   process.stdout.write('⣶');
   // }
-  // if((resultCount % PRIMES[12]) === 0) {
+  // if((resultCount % PRIMES[14]) === 0) {
   //   process.stdout.write('⣿');
   // }
 
   // if((resultCount % PRIMES[5]) === 0) {
   //   process.stdout.write('⣀');
   // }
-  // if((resultCount % PRIMES[10]) === 0) {
+  // if((resultCount % PRIMES[7]) === 0) {
   //   process.stdout.write('⣤');
   // }
-  // if((resultCount % PRIMES[15]) === 0) {
+  // if((resultCount % PRIMES[9]) === 0) {
   //   process.stdout.write('⣶');
   // }
-  // if((resultCount % PRIMES[20]) === 0) {
+  // if((resultCount % PRIMES[11]) === 0) {
   //   process.stdout.write('⣿');
   // }
 
-  if((resultCount % PRIMES[5]) === 0) {
+  if((resultCount % PRIMES[6]) === 0) {
     process.stdout.write('⣀');
   }
-  if((resultCount % PRIMES[8]) === 0) {
+  if((resultCount % PRIMES[9]) === 0) {
     process.stdout.write('⣤');
   }
-  if((resultCount % PRIMES[10]) === 0) {
+  if((resultCount % PRIMES[11]) === 0) {
     process.stdout.write('⣶');
   }
-  if((resultCount % PRIMES[11]) === 0) {
+  if((resultCount % PRIMES[12]) === 0) {
     process.stdout.write('⣿');
   }
 

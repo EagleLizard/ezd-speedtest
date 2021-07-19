@@ -671,7 +671,7 @@ export const ALEXA_CA = [
   'www.wikipedia.org',
   'www.td.com',
   'www.canada.ca',
-  'www.royalbank.com',
+  // 'www.royalbank.com',
   'www.office.com',
   'www.instagram.com',
   'www.microsoft.com',

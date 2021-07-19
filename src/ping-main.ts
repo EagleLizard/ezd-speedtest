@@ -12,21 +12,35 @@ import {
 
 import { pingForHandler } from './ping/ping-for';
 
-const DO_RUN_PING_TEST = false;
+enum PING_MODULES {
+  RUN_PING_TEST = 'RUN_PING_TEST',
+  PING_FOR = 'PING_FOR',
+  PING_FOR_PORT = 'PING_FOR_PORT',
+}
 
-// const PER_PING_WAIT_MS = 1000;
-
-// console.log(`PER_PING_WAIT_MS: ${PER_PING_WAIT_MS}`);
+// const PING_MODULE: PING_MODULES = PING_MODULES.PING_FOR_PORT;
+const PING_MODULE: PING_MODULES = PING_MODULES.PING_FOR;
 
 export async function pingMain() {
-  console.log(PING_TARGETS.length);
-
-  if(DO_RUN_PING_TEST) {
-    await runPingTestHandler();
-    return;
+  switch(PING_MODULE) {
+    case PING_MODULES.RUN_PING_TEST:
+      await runPingTestHandler();
+      break;
+    case PING_MODULES.PING_FOR:
+      await pingForHandler(PING_TARGETS);
+      break;
+    case PING_MODULES.PING_FOR_PORT:
+      await pingForPort(PING_TARGETS);
+      break;
   }
 
-  await pingForHandler(PING_TARGETS);
+}
+
+async function pingForPort(targets: string[]) {
+  for(let i = 0, currTarget: string; currTarget = targets[i], i < targets.length; ++i) {
+    // process.stdout.write(`${currTarget}, `);
+
+  }
 }
 
 async function runPingTestHandler() {
