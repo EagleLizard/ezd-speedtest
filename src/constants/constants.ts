@@ -21,6 +21,10 @@ import {
   ALEXA_BOLIVIA,
   ALEXA_FRANCE,
   ALEXA_GERMANY,
+  ALEXA_POLAND,
+  ALEXA_ITALY,
+  ALEXA_UKRAINE,
+  ALEXA_RUSSIA,
 } from './alexa-addresses';
 
 const DEFAULT_TARGETS = [
@@ -80,6 +84,7 @@ const XXX_BLOCKLIST: string[] = [
   'chaturbate',
   'xnxx',
   'mileroticos',
+  'livejasmin',
 ];
 const ECONNREFUSED_BLOCKLIST: string[] = [
   'www.diario1.com',
@@ -88,33 +93,38 @@ const ECONNREFUSED_BLOCKLIST: string[] = [
 
 const ALL_PING_TARGETS = [
 
-  // ...DEFAULT_TARGETS,
-
-  // ...ALEXA_GLOBAL,
+  ...DEFAULT_TARGETS,
   ...ALEXA_US,
-  // ...ALEXA_MEXICO,
-  // ...ALEXA_CA,
-  // ...ALEXA_PUERTO_RICO,
-  // ...ALEXA_GUATEMALA,
-  // ...ALEXA_EL_SALVADOR,
-  // ...ALEXA_COSTA_RICA,
-  // ...ALEXA_PANAMA,
+  ...ALEXA_MEXICO,
+  ...ALEXA_CA,
+  ...ALEXA_PUERTO_RICO,
+  ...ALEXA_GUATEMALA,
+  ...ALEXA_EL_SALVADOR,
+  ...ALEXA_COSTA_RICA,
+  ...ALEXA_PANAMA,
 
-  // ...ALEXA_COLOMBIA,
-  // ...ALEXA_VENEZUELA,
-  // ...ALEXA_BOLIVIA,
-  // ...ALEXA_CHILE,
-  // ...ALEXA_BRAZIL,
+  ...ALEXA_COLOMBIA,
+  ...ALEXA_VENEZUELA,
+  ...ALEXA_BOLIVIA,
+  ...ALEXA_CHILE,
+  ...ALEXA_BRAZIL,
 
-  // ...ALEXA_UK,
-  // ...ALEXA_FRANCE,
-  // ...ALEXA_GERMANY,
+  ...ALEXA_UK,
+  ...ALEXA_FRANCE,
+  ...ALEXA_POLAND,
+  ...ALEXA_GERMANY,
+  ...ALEXA_ITALY,
 
-  // ...ALEXA_AU,
-  // ...ALEXA_HK,
-  // ...ALEXA_JP,
+  ...ALEXA_UKRAINE,
+  ...ALEXA_RUSSIA,
 
-  // ...ALEXA_CHINA,
+  ...ALEXA_AU,
+  ...ALEXA_HK,
+  ...ALEXA_JP,
+
+  ...ALEXA_CHINA,
+
+  ...ALEXA_GLOBAL,
 
 ].filter(uri => {
   return !XXX_BLOCKLIST.some(xxxUri => {

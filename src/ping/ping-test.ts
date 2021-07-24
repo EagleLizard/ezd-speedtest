@@ -1,13 +1,11 @@
 
 import * as _tcpPing from 'tcp-ping';
-import { sleep } from '../lib/sleep';
 import {
-  aggregateTcpPingResults,
   runPingLoop,
   TcppErrorResult,
   tcppHasError,
-  TcpPingResultAggregate,
 } from './ping';
+import { aggregateTcpPingResults, TcpPingResultAggregate } from './ping-util';
 
 const MAX_PINGS = 50;
 const PING_THROTTLE_MS = 5;

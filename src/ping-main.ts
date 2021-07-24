@@ -1,46 +1,38 @@
 
-import * as _tcpPing from 'tcp-ping';
-
 import { PING_TARGETS } from './constants/constants';
 import { Timer } from './lib/timer';
-import {
-  TcpPingResultAggregate,
-} from './ping/ping';
 import {
   runPingTest,
 } from './ping/ping-test';
 
-import { pingForHandler } from './ping/ping-for';
+import { pingForMsHandler } from './ping/ping-for';
+import { TcpPingResultAggregate } from './ping/ping-util';
+import { pingQueueTestHandler } from './ping/ping-queue';
 
 enum PING_MODULES {
   RUN_PING_TEST = 'RUN_PING_TEST',
-  PING_FOR = 'PING_FOR',
-  PING_FOR_PORT = 'PING_FOR_PORT',
+  PING_FOR_MS = 'PING_FOR_MS',
+  PING_QUEUE = 'PING_QUEUE',
 }
 
-// const PING_MODULE: PING_MODULES = PING_MODULES.PING_FOR_PORT;
-const PING_MODULE: PING_MODULES = PING_MODULES.PING_FOR;
+let PING_MODULE: PING_MODULES;
+
+PING_MODULE = PING_MODULES.PING_FOR_MS;
+// PING_MODULE = PING_MODULES.PING_QUEUE;
 
 export async function pingMain() {
   switch(PING_MODULE) {
     case PING_MODULES.RUN_PING_TEST:
       await runPingTestHandler();
       break;
-    case PING_MODULES.PING_FOR:
-      await pingForHandler(PING_TARGETS);
+    case PING_MODULES.PING_FOR_MS:
+      await pingForMsHandler(PING_TARGETS);
       break;
-    case PING_MODULES.PING_FOR_PORT:
-      await pingForPort(PING_TARGETS);
+    case PING_MODULES.PING_QUEUE:
+      await pingQueueTestHandler(PING_TARGETS, 7);
       break;
   }
 
-}
-
-async function pingForPort(targets: string[]) {
-  for(let i = 0, currTarget: string; currTarget = targets[i], i < targets.length; ++i) {
-    // process.stdout.write(`${currTarget}, `);
-
-  }
 }
 
 async function runPingTestHandler() {
