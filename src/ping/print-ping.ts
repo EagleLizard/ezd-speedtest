@@ -7,7 +7,9 @@ export function getPrintByCount(numTargets: number, primeBase: number, primeDiff
   let charArr: string[], moduloFactors: number[];
   charArr = [
     '⣀',
+    '⣠',
     '⣤',
+    '⣴',
     '⣶',
     '⣾',
     '⣿',

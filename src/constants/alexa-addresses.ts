@@ -505,7 +505,6 @@ export const ALEXA_VENEZUELA = [
   'www.facebook.com',
   'www.bancodevenezuela.com',
   'www.mercadolibre.com.ve',
-  'www.banesconline.com',
   'www.mercantilbanco.com',
   'www.live.com',
   'www.yahoo.com',

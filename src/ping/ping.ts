@@ -21,44 +21,13 @@ console.error(`CONCURRENT_SLEEP_MS: ${CONCURRENT_SLEEP_MS}`);
 
 export function ping(pingOpts: _tcpPing.Options): Promise<_tcpPing.Result> {
   return new Promise((resolve, reject) => {
-    (async () => {
-      while(concurrentConnections > CONCURRENT_CONNECTION_MAX) {
-        await sleep(CONCURRENT_SLEEP_MS);
+    _tcpPing.ping(pingOpts, (err: unknown, data: _tcpPing.Result) => {
+      if(err) {
+        return reject(err);
       }
-      concurrentConnections++;
-      _tcpPing.ping(pingOpts, (err: unknown, data: _tcpPing.Result) => {
-        concurrentConnections--;
-        if(err) {
-          return reject(err);
-        }
-        resolve(data);
-      });
-    })();
-  });
-}
-
-export async function runPingLoop(address: string, cb: (result: _tcpPing.Result) => Promise<boolean>): Promise<void> {
-  let pingResult: _tcpPing.Result, doStop: boolean;
-  let port: number, portFlip: boolean;
-  portFlip = false;
-  for(;;) {
-    port = portFlip ? 80 : 443;
-    portFlip = !portFlip;
-    /*
-      80
-      443
-    */
-    pingResult = await ping({
-      address,
-      attempts: 1,
-      // port: 80,
-      port,
+      resolve(data);
     });
-    doStop = await cb(pingResult);
-    if(doStop) {
-      break;
-    }
-  }
+  });
 }
 
 export interface TcppErrorResult {

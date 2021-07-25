@@ -26,6 +26,9 @@ import {
   ALEXA_UKRAINE,
   ALEXA_RUSSIA,
 } from './alexa-addresses';
+import {
+  SEMRUSH_US,
+} from './topsites';
 
 const DEFAULT_TARGETS = [
   'www.qualtrics.com',
@@ -94,6 +97,7 @@ const ECONNREFUSED_BLOCKLIST: string[] = [
 const ALL_PING_TARGETS = [
 
   ...DEFAULT_TARGETS,
+  ...SEMRUSH_US,
   ...ALEXA_US,
   ...ALEXA_MEXICO,
   ...ALEXA_CA,

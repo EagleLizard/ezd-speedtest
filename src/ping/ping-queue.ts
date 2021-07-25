@@ -3,7 +3,14 @@ import * as _tcpPing from 'tcp-ping';
 import { sleep } from '../lib/sleep';
 import { ping } from './ping';
 
-const PING_QUEUE_MAX = 50;
+const PING_QUEUE_MAX = 37;
+const PING_QUEUE_CHECK_INTERVAL = 1000;
+const pingQueueMaxStr = `PING_QUEUE_MAX: ${PING_QUEUE_MAX}`;
+const pingQueueCheckIntervalStr = `PING_QUEUE_CHECK_INTERVAL: ${PING_QUEUE_CHECK_INTERVAL}`;
+console.log(pingQueueMaxStr);
+console.log(pingQueueCheckIntervalStr);
+console.error(pingQueueMaxStr);
+console.error(pingQueueCheckIntervalStr);
 
 type pingJobData = _tcpPing.Result;
 
@@ -44,45 +51,58 @@ export class PingQueue {
 
   start() {
     this.doCheck = true;
-    this.checkQueue();
+    this.checkQueueLoop();
   }
 
   stop() {
     this.doCheck = false;
   }
 
+  isRunning(): boolean {
+    return this.doCheck;
+  }
+
   private enqueue(pingJob: PingJob) {
     this.pingJobQueue.push(pingJob);
+  }
+
+  private dequeue(pingJob: PingJob) {
+    let foundJobIdx: number;
+    foundJobIdx = this.runningPingJobs.findIndex(pingJob => {
+      return pingJob.id === pingJob.id;
+    });
+    if(foundJobIdx === -1) {
+      const err = new Error(`Running Job Not Found ${pingJob.id}`);
+      console.error(pingJob);
+      throw err;
+    }
+    this.runningPingJobs.splice(foundJobIdx, 1);
+    this.checkQueue();
   }
 
   private startJob() {
     const currPingJob = this.pingJobQueue.shift();
     ping(currPingJob.pingOpts).then(tcpPingResult => {
-      let foundJobIdx: number;
-      foundJobIdx = this.runningPingJobs.findIndex(pingJob => {
-        return pingJob.id === currPingJob.id;
-      });
-      if(foundJobIdx === -1) {
-        const err = new Error(`Running Job Not Found ${currPingJob.id}`);
-        console.error(currPingJob);
-        throw err;
-      }
       currPingJob.resolver(tcpPingResult);
-      this.runningPingJobs.splice(foundJobIdx, 1);
+      this.dequeue(currPingJob);
     });
     this.runningPingJobs.push(currPingJob);
   }
 
   private checkQueue() {
+    while(
+      (this.pingJobQueue.length > 0)
+      && (this.runningPingJobs.length <= PING_QUEUE_MAX)
+    ) {
+      this.startJob();
+    }
+  }
+
+  private checkQueueLoop() {
     if(this.doCheck) {
-      while(
-        (this.pingJobQueue.length > 0)
-        && (this.runningPingJobs.length <= PING_QUEUE_MAX)
-      ) {
-        this.startJob();
-      }
-      sleep(100).then(() => {
-        this.checkQueue();
+      this.checkQueue();
+      sleep(PING_QUEUE_CHECK_INTERVAL).then(() => {
+        this.checkQueueLoop();
       });
     }
   }

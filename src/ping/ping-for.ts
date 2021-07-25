@@ -5,11 +5,10 @@ const chance = new _chance;
 
 import { getWeightedAverages, WeightedAverages } from '../lib/math-util';
 import { Timer } from '../lib/timer';
-import { runPingLoop } from './ping';
 import { getIntuitiveTimeStr } from '../lib/time-util';
-import { sleep } from '../lib/sleep';
 import { aggregateTcpPingResults, TcpPingResultAggregate } from './ping-util';
 import { getPrintByCount } from './print-ping';
+import { runPingLoop, stopPingQueue } from './ping-loop';
 
 export async function pingForMsHandler(targets: string[]) {
   let timer: Timer, deltaMs: number;
@@ -24,24 +23,14 @@ export async function pingForMsHandler(targets: string[]) {
   console.log(`num targets: ${targets.length}`);
   console.error(`num targets: ${targets.length}`);
 
-  // const PER_PING_WAIT_MS = Math.round(Math.E * targets.length);
-  const PER_PING_WAIT_MS = Math.round(Math.E * (targets.length / 2));
-  // const PER_PING_WAIT_MS = Math.round(Math.LOG2E * (targets.length / 1.5));
-
-  // const PER_PING_WAIT_MS = 10;
-  // const PER_PING_WAIT_MS = 100;
-  // const PER_PING_WAIT_MS = 300;
-  // const PER_PING_WAIT_MS = 1000;
-  // const PER_PING_WAIT_MS = 1500;
-
-  console.log(`PER_PING_WAIT_MS: ${PER_PING_WAIT_MS}`);
-  console.error(`PER_PING_WAIT_MS: ${PER_PING_WAIT_MS}`);
-
-  minutes = 10.0;
+  minutes = 0.0625;
   minutes = 5.0;
-  minutes = 0.25;
+  minutes = 10.0;
+  minutes = 0.75;
   minutes = 1.0;
+  minutes = 3.0;
   minutes = 0.5;
+  minutes = 0.25;
   seconds = minutes * 60;
   ms = Math.round(seconds * 1000);
   console.log(getIntuitiveTimeStr(ms));
@@ -54,7 +43,7 @@ export async function pingForMsHandler(targets: string[]) {
   lastMs = Date.now();
   totalResultCount = 0;
 
-  const printByCount = getPrintByCount(targets.length, 4, 5);
+  const printByCount = getPrintByCount(targets.length, 5, 4);
 
   const pingForCb = async (result: _tcpPing.Result): Promise<boolean> => {
     totalResultCount++; // 	06/24/2021 03:45:42.798-0600
@@ -82,7 +71,6 @@ export async function pingForMsHandler(targets: string[]) {
     uriCountMap[result.address]++;
     results.push(result);
     resultsWindow.push(result);
-    await sleep(PER_PING_WAIT_MS);
     return false;
   };
 
@@ -98,6 +86,8 @@ export async function pingForMsHandler(targets: string[]) {
   }
 
   await Promise.all(pingForPromises);
+
+  stopPingQueue();
   process.stdout.write('\n');
 
   deltaMs = timer.stop();

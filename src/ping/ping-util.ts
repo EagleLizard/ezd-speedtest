@@ -59,9 +59,9 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
         const error = new Error(`${currSeqResult.err.message} ${currResult.address}`);
         if(
           !(
-            currSeqResult.err.message.includes('ECONNREFUSED')
+            currSeqResult.err.message.includes('timeout')
+            // || currSeqResult.err.message.includes('ECONNREFUSED')
             || currSeqResult.err.message.includes('EADDRNOTAVAIL')
-            || currSeqResult.err.message.includes('timeout')
           )
         ) {
           // console.error(error);

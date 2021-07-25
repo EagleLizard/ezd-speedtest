@@ -1,10 +1,10 @@
 
 import * as _tcpPing from 'tcp-ping';
 import {
-  runPingLoop,
   TcppErrorResult,
   tcppHasError,
 } from './ping';
+import { runPingLoop } from './ping-loop';
 import { aggregateTcpPingResults, TcpPingResultAggregate } from './ping-util';
 
 const MAX_PINGS = 50;
