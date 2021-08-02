@@ -1,16 +1,19 @@
 
 import * as _tcpPing from 'tcp-ping';
 import { sleep } from '../lib/sleep';
+import { Timer } from '../lib/timer';
 import { ping } from './ping';
 
-const PING_QUEUE_MAX = 37;
+const _PING_QUEUE_MAX = 25;
 const PING_QUEUE_CHECK_INTERVAL = 1000;
-const pingQueueMaxStr = `PING_QUEUE_MAX: ${PING_QUEUE_MAX}`;
-const pingQueueCheckIntervalStr = `PING_QUEUE_CHECK_INTERVAL: ${PING_QUEUE_CHECK_INTERVAL}`;
-console.log(pingQueueMaxStr);
-console.log(pingQueueCheckIntervalStr);
-console.error(pingQueueMaxStr);
-console.error(pingQueueCheckIntervalStr);
+const QUEUE_CLEAR_MS = 10;
+const POST_QUEUE_CLEAR_MS = 100;
+// const PING_QUEUE_SHRINK_DIVISOR = 128;
+// const PING_QUEUE_SHRINK_DIVISOR = 64;
+const PING_QUEUE_SHRINK_DIVISOR = 32;
+// const PING_QUEUE_SHRINK_DIVISOR = 16;
+// const PING_QUEUE_SHRINK_DIVISOR = 8;
+// const PING_QUEUE_SHRINK_DIVISOR = 4;
 
 type pingJobData = _tcpPing.Result;
 
@@ -24,14 +27,56 @@ export class PingQueue {
   pingJobQueue: PingJob[];
   runningPingJobs: PingJob[];
 
-  private doCheck: boolean;
-  private uniqueJobId: number;
+  private PING_QUEUE_MAX: number;
 
-  constructor() {
+  private doCheck: boolean;
+  private doClearRunQueue: boolean;
+  private uniqueJobId: number;
+  private queueClearPromise: Promise<void>;
+
+  numQueueClears: number;
+  clearQueueTimeMs: number;
+
+  constructor(numTargets: number) {
+
     this.pingJobQueue = [];
     this.runningPingJobs = [];
     this.doCheck = false;
+    this.doClearRunQueue = false;
     this.uniqueJobId = 0;
+
+    this.numQueueClears = 0;
+    this.clearQueueTimeMs = 0;
+
+    const queueSizeFromTargets = numTargets / 1.5;
+    this.PING_QUEUE_MAX = (queueSizeFromTargets <= _PING_QUEUE_MAX)
+      ? _PING_QUEUE_MAX
+      : Math.round(queueSizeFromTargets)
+    ;
+    /*
+      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    */
+    const pingQueueMaxStr = `PING_QUEUE_MAX: ${this.PING_QUEUE_MAX}`;
+    const pingQueueCheckIntervalStr = `PING_QUEUE_CHECK_INTERVAL: ${PING_QUEUE_CHECK_INTERVAL}`;
+    const queueClearMsStr = `QUEUE_CLEAR_MS: ${QUEUE_CLEAR_MS}`;
+    const postQueueClearMsStr = `POST_QUEUE_CLEAR_MS: ${POST_QUEUE_CLEAR_MS}`;
+    const pingQueueShrinkDivisorStr = `PING_QUEUE_SHRINK_DIVISOR: ${PING_QUEUE_SHRINK_DIVISOR}`;
+    console.log(pingQueueMaxStr);
+    console.log(pingQueueCheckIntervalStr);
+    console.log(queueClearMsStr);
+    console.log(postQueueClearMsStr);
+    console.log(pingQueueShrinkDivisorStr);
+    console.error();
+    console.error(pingQueueMaxStr);
+    console.error(pingQueueCheckIntervalStr);
+    console.error(queueClearMsStr);
+    console.error(postQueueClearMsStr);
+    console.error(pingQueueShrinkDivisorStr);
+    console.error();
+  }
+
+  get pingQueueMax(): number {
+    return this.PING_QUEUE_MAX;
   }
 
   queuePing(opts: _tcpPing.Options): Promise<_tcpPing.Result> {
@@ -45,7 +90,7 @@ export class PingQueue {
         pingOpts: opts,
         resolver,
       };
-      this.enqueue(pingJob);
+      this.enqueuePingJob(pingJob);
     });
   }
 
@@ -54,7 +99,8 @@ export class PingQueue {
     this.checkQueueLoop();
   }
 
-  stop() {
+  async stop() {
+    await this.waitForRunQueueClear();
     this.doCheck = false;
   }
 
@@ -62,11 +108,15 @@ export class PingQueue {
     return this.doCheck;
   }
 
-  private enqueue(pingJob: PingJob) {
+  private async enqueuePingJob(pingJob: PingJob) {
     this.pingJobQueue.push(pingJob);
   }
 
-  private dequeue(pingJob: PingJob) {
+  private async enqueueRunningPingJob(pingJob: PingJob) {
+    this.runningPingJobs.push(pingJob);
+  }
+
+  private dequeuePingJob(pingJob: PingJob) {
     let foundJobIdx: number;
     foundJobIdx = this.runningPingJobs.findIndex(pingJob => {
       return pingJob.id === pingJob.id;
@@ -80,27 +130,82 @@ export class PingQueue {
     this.checkQueue();
   }
 
-  private startJob() {
-    const currPingJob = this.pingJobQueue.shift();
-    ping(currPingJob.pingOpts).then(tcpPingResult => {
-      currPingJob.resolver(tcpPingResult);
-      this.dequeue(currPingJob);
+  private async waitForRunQueueClear() {
+    if(!this.doClearRunQueue) {
+      return;
+    }
+    if(this.queueClearPromise !== undefined) {
+      return this.queueClearPromise;
+    }
+    this.queueClearPromise = new Promise<void>(resolve => {
+
+      let queueClearTimer = Timer.start();
+
+      (async () => {
+        const ERR_CHAR = '•';
+        process.stdout.write('X');
+        while(this.runningPingJobs.length > 0) {
+          await sleep(QUEUE_CLEAR_MS);
+        }
+
+        if(this.PING_QUEUE_MAX > 25) {
+          const nextPingDiff = Math.ceil((this.PING_QUEUE_MAX - _PING_QUEUE_MAX) / PING_QUEUE_SHRINK_DIVISOR);
+
+          this.PING_QUEUE_MAX = this.PING_QUEUE_MAX - nextPingDiff;
+
+          console.error(`ping max diff: ${nextPingDiff}`);
+          console.error(`this.PING_QUEUE_MAX: ${this.PING_QUEUE_MAX}`);
+        }
+        process.stdout.write(ERR_CHAR);
+        await sleep(POST_QUEUE_CLEAR_MS);
+        resolve();
+        this.doClearRunQueue = false;
+        this.numQueueClears++;
+        this.queueClearPromise = undefined;
+        this.clearQueueTimeMs += queueClearTimer.stop();
+      })();
     });
-    this.runningPingJobs.push(currPingJob);
+    return this.queueClearPromise;
   }
 
-  private checkQueue() {
+  private async startJob() {
+    const currPingJob = this.pingJobQueue.shift();
+    ping(currPingJob.pingOpts).then(tcpPingResult => {
+      if(tcpPingResult.results?.length > 0) {
+        const tcpPingResultsArr = tcpPingResult.results;
+        for(let i = 0, currResults: _tcpPing.Results; currResults = tcpPingResultsArr[i], i < tcpPingResultsArr.length; ++i) {
+          if(
+            (currResults.err !== undefined)
+            && (currResults.err.message.includes('EADDRNOTAVAIL'))
+          ) {
+            this.doClearRunQueue = true;
+            break;
+          }
+        }
+      }
+      currPingJob.resolver(tcpPingResult);
+      this.dequeuePingJob(currPingJob);
+    });
+    this.enqueueRunningPingJob(currPingJob);
+  }
+
+  private async checkQueue() {
+    if(this.doClearRunQueue) {
+      return await this.waitForRunQueueClear();
+    }
     while(
       (this.pingJobQueue.length > 0)
-      && (this.runningPingJobs.length <= PING_QUEUE_MAX)
+      && (this.runningPingJobs.length <= this.PING_QUEUE_MAX)
     ) {
-      this.startJob();
+      await this.startJob();
     }
   }
 
   private checkQueueLoop() {
     if(this.doCheck) {
-      this.checkQueue();
+      if(!this.doClearRunQueue) {
+        this.checkQueue();
+      }
       sleep(PING_QUEUE_CHECK_INTERVAL).then(() => {
         this.checkQueueLoop();
       });
@@ -118,7 +223,7 @@ export async function pingQueueTestHandler(targets: string[], testRuns = 1) {
     return acc;
   }, {} as Record<string, _tcpPing.Result[]>);
 
-  pingQueue = new PingQueue;
+  pingQueue = new PingQueue(targets.length);
   pingQueue.start();
   pingJobPromises = [];
 
@@ -141,7 +246,7 @@ export async function pingQueueTestHandler(targets: string[], testRuns = 1) {
   } catch(e) {
     console.log(e);
   }
-  pingQueue.stop();
+  await pingQueue.stop();
 
   console.log('pingJobResults');
   console.log(pingJobResults.length);

@@ -26,13 +26,14 @@ export interface TcpPingResultAggregate {
   failed: number;
   econnrefusedCount: number;
   eaddrnotavailCount: number;
+  enotfoundCount: number;
 }
 
 export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpPingResultAggregate {
   let resultAggregate: TcpPingResultAggregate;
   let attempts: number, sum: number, min: number, max: number,
     avg: number, median: number, timed_out: number, failed: number,
-    econnrefusedCount: number, eaddrnotavailCount: number;
+    econnrefusedCount: number, eaddrnotavailCount: number, enotfoundCount: number;
   let timeVals: number[];
   attempts = 0;
   sum = 0;
@@ -42,6 +43,7 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
   failed = 0;
   econnrefusedCount = 0;
   eaddrnotavailCount = 0;
+  enotfoundCount = 0;
   timeVals = [];
   for(let i = 0, currResult: _tcpPing.Result; currResult = tcpPingResults[i], i < tcpPingResults.length; ++i) {
     // console.log(`\n${currResult.address}`);
@@ -60,7 +62,7 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
         if(
           !(
             currSeqResult.err.message.includes('timeout')
-            // || currSeqResult.err.message.includes('ECONNREFUSED')
+            || currSeqResult.err.message.includes('ECONNREFUSED')
             || currSeqResult.err.message.includes('EADDRNOTAVAIL')
           )
         ) {
@@ -76,10 +78,13 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
         if(currSeqResult.err.message.includes('EADDRNOTAVAIL')) {
           eaddrnotavailCount++;
         }
+        if(currSeqResult.err.message.includes('ENOTFOUND')) {
+          enotfoundCount++;
+        }
         // console.log(currSeqResult.err);
         if(currSeqResult.err.message.includes('timeout')) {
           timed_out++;
-        } else {
+        } else if(!currSeqResult.err.message.includes('EADDRNOTAVAIL')) {
           failed++;
         }
         continue;
@@ -106,6 +111,7 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
     failed,
     econnrefusedCount,
     eaddrnotavailCount,
+    enotfoundCount,
   };
   return resultAggregate;
 }

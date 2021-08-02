@@ -1,9 +1,12 @@
 
-import * as math from 'mathjs';
-
 import { PRIMES } from '../lib/math-util';
 
-export function getPrintByCount(numTargets: number, primeBase: number, primeDiff: number): (resultCount: number) => void {
+export function getPrintByCount(
+  numTargets: number,
+  primeBase: number,
+  primeBaseMod: number,
+  transform?: (resultCount: number, charIdx: number, numChars?: number) => boolean
+): (resultCount: number) => void {
   let charArr: string[], moduloFactors: number[];
   charArr = [
     '⣀',
@@ -14,17 +17,35 @@ export function getPrintByCount(numTargets: number, primeBase: number, primeDiff
     '⣾',
     '⣿',
   ];
-  moduloFactors = charArr.map((char, idx) => {
-    let primeNum: number;
-    primeNum = PRIMES[primeBase + (primeDiff * idx)];
-    return primeNum;
-  });
 
-  console.log('moduloFactors:');
-  console.log(moduloFactors);
+  const visitedPrintCharMap: Record<number, boolean> = {};
+  const defaultTransform = (resultCount: number, charIdx: number) => {
+    let base: number, baseMod: number, baseIdxMod: number,
+      primeIdx: number;
+    let modVal: number, doPrint: boolean;
+
+    base = primeBase;
+    baseMod = primeBaseMod;
+
+    baseIdxMod = (baseMod * charIdx);
+    primeIdx = base + baseIdxMod;
+    modVal = PRIMES[primeIdx];
+    doPrint = (resultCount % modVal) === 0;
+    if(doPrint && !visitedPrintCharMap[charIdx]) {
+      visitedPrintCharMap[charIdx] = true;
+      console.error(`charIdx: ${charIdx}, primeIdx: ${primeIdx}, primeVal: ${modVal}`);
+    }
+    return doPrint;
+  };
+  if(transform === undefined) {
+    transform = defaultTransform;
+  }
+
   return (resultCount: number) => {
-    for(let i = 0; i < moduloFactors.length; ++i) {
-      if((resultCount % moduloFactors[i]) === 0) {
+    for(let i = 0; i < charArr.length; ++i) {
+      let doPrint: boolean;
+      doPrint = transform(resultCount, i, charArr.length);
+      if(doPrint) {
         process.stdout.write(charArr[i]);
       }
     }

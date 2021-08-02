@@ -8,14 +8,14 @@ import { Timer } from '../lib/timer';
 import { getIntuitiveTimeStr } from '../lib/time-util';
 import { aggregateTcpPingResults, TcpPingResultAggregate } from './ping-util';
 import { getPrintByCount } from './print-ping';
-import { runPingLoop, stopPingQueue } from './ping-loop';
+import { initializePingQueue, runPingLoop, stopPingQueue } from './ping-loop';
 
 export async function pingForMsHandler(targets: string[]) {
   let timer: Timer, deltaMs: number;
   let pingResultAggregate: TcpPingResultAggregate, uriCountMap: Record<string, number>,
     uriCountTuples: [ string, number ][], totalResultCount: number;
   let uriCounts: number[], uriCountStdDev: number, percentResultsFailed: number,
-    uriCountStdDevPercent: number, avgUriCount: number;
+    uriCountStdDevPercent: number, avgUriCount: number, eaddrnotavailPercent: number;
   let successfulPings: number, pingsPerSecond: number;
   let results: _tcpPing.Result[], resultsWindow: _tcpPing.Result[], pingForPromises: Promise<void>[];
   let lastMs: number;
@@ -23,14 +23,19 @@ export async function pingForMsHandler(targets: string[]) {
   console.log(`num targets: ${targets.length}`);
   console.error(`num targets: ${targets.length}`);
 
-  minutes = 0.0625;
-  minutes = 5.0;
-  minutes = 10.0;
+  await initializePingQueue(targets.length);
+
   minutes = 0.75;
-  minutes = 1.0;
   minutes = 3.0;
-  minutes = 0.5;
+  minutes = 0.125;
+  minutes = 10.0;
+  minutes = 30.0;
+  minutes = 2.0;
+  minutes = 5.0;
+  minutes = 15.0;
   minutes = 0.25;
+  minutes = 0.5;
+  minutes = 1.0;
   seconds = minutes * 60;
   ms = Math.round(seconds * 1000);
   console.log(getIntuitiveTimeStr(ms));
@@ -43,15 +48,15 @@ export async function pingForMsHandler(targets: string[]) {
   lastMs = Date.now();
   totalResultCount = 0;
 
-  const printByCount = getPrintByCount(targets.length, 5, 4);
+  const printByCount = getPrintByCount(targets.length, 11, 11);
 
   const pingForCb = async (result: _tcpPing.Result): Promise<boolean> => {
-    totalResultCount++; // 	06/24/2021 03:45:42.798-0600
+    totalResultCount++;
 
     printByCount(totalResultCount);
 
-    const lastMsMax = 1000;
-    const flopRange = Math.round(lastMsMax / 200);
+    const lastMsMax = 2500;
+    const flopRange = Math.round(lastMsMax / 500);
     const coinFlop = chance.integer({
       min: -1 * flopRange,
       max: flopRange,
@@ -87,7 +92,7 @@ export async function pingForMsHandler(targets: string[]) {
 
   await Promise.all(pingForPromises);
 
-  stopPingQueue();
+  await stopPingQueue();
   process.stdout.write('\n');
 
   deltaMs = timer.stop();
@@ -110,13 +115,15 @@ export async function pingForMsHandler(targets: string[]) {
     ...uriCountTuples.slice(0, countTupleSliceWindow),
     [],
     ...uriCountTuples.slice(-1 * countTupleSliceWindow),
+
+    // ...uriCountTuples,
+
   ].forEach(uriCountTuple => {
     console.error(uriCountTuple);
-    // console.error(`${uriCountTuple[0]} => ${uriCountTuple[1]}`);
   });
   pingResultAggregate = aggregateTcpPingResults(results);
   // console.error(uriCountTuples);
-  successfulPings = pingResultAggregate.attempts - pingResultAggregate.failed;
+  successfulPings = (pingResultAggregate.attempts - pingResultAggregate.failed) - pingResultAggregate.eaddrnotavailCount;
   pingsPerSecond = Math.round(successfulPings / (deltaMs / 1000));
 
   uriCounts = uriCountTuples.map(uriCountTuple => uriCountTuple[1]);
@@ -124,8 +131,10 @@ export async function pingForMsHandler(targets: string[]) {
   avgUriCount = math.mean(uriCounts);
   uriCountStdDevPercent = (uriCountStdDev / avgUriCount) * 100;
   percentResultsFailed = (pingResultAggregate.failed / pingResultAggregate.attempts) * 100;
+  eaddrnotavailPercent = (pingResultAggregate.eaddrnotavailCount / pingResultAggregate.attempts) * 100;
 
   console.log(pingResultAggregate);
+  console.error(pingResultAggregate);
   calculateAverages(results);
 
   console.log(`\ntook: ${getIntuitiveTimeStr(deltaMs)}`);
@@ -134,20 +143,28 @@ export async function pingForMsHandler(targets: string[]) {
   const stdDevStr = `-- StdDev: ${uriCountStdDev.toFixed(2)}`;
   const stdDevPercentStr = `-- StdDev %: ${uriCountStdDevPercent.toFixed(3)} %`;
   const percentResultsFailedStr = `-- Failed:: ${percentResultsFailed.toFixed(4)} %`;
+  const percentEaddrnotavailStr = `-- EADDRNOTAVAIL: ${eaddrnotavailPercent.toFixed(4)} %`;
   const econnrefusedCountStr = `-- econnrefused: ${pingResultAggregate.econnrefusedCount.toLocaleString()}`;
   const eaddrnotavailCountStr = `-- eaddrnotavail: ${pingResultAggregate.eaddrnotavailCount.toLocaleString()}`;
+  const enotfoundCountStr = `-- enotfound: ${pingResultAggregate.enotfoundCount.toLocaleString()}`;
   console.log(`\n${stdDevStr}`);
   console.log(stdDevPercentStr);
-  console.log(percentResultsFailedStr);
   console.log(econnrefusedCountStr);
   console.log(eaddrnotavailCountStr);
+  console.log(enotfoundCountStr);
+  console.log('\n');
+  console.log(percentResultsFailedStr);
+  console.log(percentEaddrnotavailStr);
   console.log(`\n${pingsPerSecond} pings/second`);
 
   console.error(stdDevStr);
   console.error(stdDevPercentStr);
-  console.error(percentResultsFailedStr);
   console.error(econnrefusedCountStr);
   console.error(eaddrnotavailCountStr);
+  console.error(enotfoundCountStr);
+  console.error('\n');
+  console.error(percentResultsFailedStr);
+  console.error(percentEaddrnotavailStr);
   console.error(`\n${pingsPerSecond} pings/second`);
 }
 

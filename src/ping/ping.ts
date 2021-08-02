@@ -4,21 +4,6 @@ sourceMapSupport.install();
 
 import  * as _tcpPing from 'tcp-ping';
 
-import {
-  sleep,
-} from '../lib/sleep';
-
-let concurrentConnections = 0;
-
-const CONCURRENT_CONNECTION_MAX = 50;
-const CONCURRENT_SLEEP_MS = 200;
-
-console.log(`CONCURRENT_CONNECTION_MAX: ${CONCURRENT_CONNECTION_MAX}`);
-console.log(`CONCURRENT_SLEEP_MS: ${CONCURRENT_SLEEP_MS}`);
-console.error('');
-console.error(`CONCURRENT_CONNECTION_MAX: ${CONCURRENT_CONNECTION_MAX}`);
-console.error(`CONCURRENT_SLEEP_MS: ${CONCURRENT_SLEEP_MS}`);
-
 export function ping(pingOpts: _tcpPing.Options): Promise<_tcpPing.Result> {
   return new Promise((resolve, reject) => {
     _tcpPing.ping(pingOpts, (err: unknown, data: _tcpPing.Result) => {
