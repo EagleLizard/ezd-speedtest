@@ -3,16 +3,14 @@ import  * as _tcpPing from 'tcp-ping';
 import * as math from 'mathjs';
 
 export function groupByAddress(results: _tcpPing.Result[]) {
-  let resultMap: Record<string, _tcpPing.Results[]>;
+  let resultMap: Record<string, _tcpPing.Result[]>;
   resultMap = results.reduce((acc, curr) => {
     if(acc[curr.address] === undefined) {
       acc[curr.address] = [];
     }
-    curr.results.forEach(resultsObj => {
-      acc[curr.address].push(resultsObj);
-    });
+    acc[curr.address].push(curr);
     return acc;
-  }, {} as Record<string, _tcpPing.Results[]>);
+  }, {} as Record<string, _tcpPing.Result[]>);
   return resultMap;
 }
 
@@ -62,10 +60,11 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
         if(
           !(
             currSeqResult.err.message.includes('timeout')
-            || currSeqResult.err.message.includes('ECONNREFUSED')
+            // || currSeqResult.err.message.includes('ECONNREFUSED')
             || currSeqResult.err.message.includes('EADDRNOTAVAIL')
           )
         ) {
+          // console.error('error:');
           // console.error(error);
           console.error(currResult.address);
           console.error(currSeqResult.err.message.split('\n')[0]);

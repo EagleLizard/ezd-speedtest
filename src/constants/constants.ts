@@ -25,6 +25,9 @@ import {
   ALEXA_ITALY,
   ALEXA_UKRAINE,
   ALEXA_RUSSIA,
+  ALEXA_SINGAPORE,
+  ALEXA_GREECE,
+  ALEXA_INDIA,
 } from './alexa-addresses';
 import {
   SEMRUSH_US,
@@ -95,18 +98,32 @@ const XXX_BLOCKLIST: string[] = [
 const ECONNREFUSED_BLOCKLIST: string[] = [
   'www.diario1.com',
   'www.amazonaws.com',
+  'www.ues.edu.sv',
+  'www.newsauto.gr',
+  'www.terra.com.br',
+  'www.rakuten-sec.co.jp',
+  'www.scotiabank.fi.cr',
+  'www.lifo.gr',
+  'www.reclameaqui.com.br',
+  'www.protothema.gr',
 ];
 const ENOTFOUND_BLOCKLIST: string[] = [
   'www.bing.com',
   'www.office.com',
+  'www.services.gov.gr',
+  'www.amazon.sg',
+  'www.nur.edu',
+  'www.marca.com',
+  'www.patria.org.ve',
+  'www.google.com.bo',
 ];
 
 const ALL_PING_TARGETS = [
 
   ...DEFAULT_TARGETS,
-
   ...SEMRUSH_US,
   ...ALEXA_US,
+
   ...ALEXA_MEXICO,
   ...ALEXA_CA,
 
@@ -127,14 +144,18 @@ const ALL_PING_TARGETS = [
   ...ALEXA_POLAND,
   ...ALEXA_GERMANY,
   ...ALEXA_ITALY,
+  ...ALEXA_GREECE,
 
   ...ALEXA_AU,
   ...ALEXA_JP,
+  ...ALEXA_SINGAPORE,
+
+  ...ALEXA_HK,
 
   ...ALEXA_UKRAINE,
   ...ALEXA_RUSSIA,
 
-  ...ALEXA_HK,
+  ...ALEXA_INDIA,
   ...ALEXA_CHINA,
 
   ...ALEXA_GLOBAL,

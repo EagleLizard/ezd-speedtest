@@ -2,16 +2,23 @@
 import * as _tcpPing from 'tcp-ping';
 import { sleep } from '../lib/sleep';
 import { Timer } from '../lib/timer';
-import { ping } from './ping';
+import { ping, waitForPort } from './ping';
 
-const _PING_QUEUE_MAX = 25;
+const _PING_QUEUE_MIN = 10;
+const _PING_QUEUE_MAX = 30;
+// const _PING_QUEUE_MAX = 31;
 const PING_QUEUE_CHECK_INTERVAL = 1000;
 const QUEUE_CLEAR_MS = 10;
+
+// const POST_QUEUE_CLEAR_MS = 100;
 const POST_QUEUE_CLEAR_MS = 100;
+
 // const PING_QUEUE_SHRINK_DIVISOR = 128;
 // const PING_QUEUE_SHRINK_DIVISOR = 64;
-const PING_QUEUE_SHRINK_DIVISOR = 32;
+// const PING_QUEUE_SHRINK_DIVISOR = 32;
+const PING_QUEUE_SHRINK_DIVISOR = 24;
 // const PING_QUEUE_SHRINK_DIVISOR = 16;
+// const PING_QUEUE_SHRINK_DIVISOR = 12;
 // const PING_QUEUE_SHRINK_DIVISOR = 8;
 // const PING_QUEUE_SHRINK_DIVISOR = 4;
 
@@ -33,6 +40,7 @@ export class PingQueue {
   private doClearRunQueue: boolean;
   private uniqueJobId: number;
   private queueClearPromise: Promise<void>;
+  private portFlip: boolean;
 
   numQueueClears: number;
   clearQueueTimeMs: number;
@@ -44,15 +52,19 @@ export class PingQueue {
     this.doCheck = false;
     this.doClearRunQueue = false;
     this.uniqueJobId = 0;
+    this.portFlip = false;
 
     this.numQueueClears = 0;
     this.clearQueueTimeMs = 0;
 
     const queueSizeFromTargets = numTargets / 1.5;
-    this.PING_QUEUE_MAX = (queueSizeFromTargets <= _PING_QUEUE_MAX)
-      ? _PING_QUEUE_MAX
-      : Math.round(queueSizeFromTargets)
-    ;
+    if(queueSizeFromTargets <= _PING_QUEUE_MIN) {
+      this.PING_QUEUE_MAX = _PING_QUEUE_MIN;
+    } else if(queueSizeFromTargets > _PING_QUEUE_MAX) {
+      this.PING_QUEUE_MAX = _PING_QUEUE_MAX;
+    } else {
+      this.PING_QUEUE_MAX = Math.round(queueSizeFromTargets);
+    }
     /*
       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     */
@@ -137,25 +149,35 @@ export class PingQueue {
     if(this.queueClearPromise !== undefined) {
       return this.queueClearPromise;
     }
+
     this.queueClearPromise = new Promise<void>(resolve => {
+      let waitForPort80Promise: Promise<void>, waitForPort443Promise: Promise<void>;
 
       let queueClearTimer = Timer.start();
 
       (async () => {
         const ERR_CHAR = '•';
         process.stdout.write('X');
+
         while(this.runningPingJobs.length > 0) {
           await sleep(QUEUE_CLEAR_MS);
         }
+        waitForPort80Promise = waitForPort(80, 'www.google.com');
+        waitForPort443Promise = waitForPort(443, 'www.google.com');
+        await Promise.all([
+          waitForPort80Promise,
+          waitForPort443Promise,
+        ]);
 
-        if(this.PING_QUEUE_MAX > 25) {
-          const nextPingDiff = Math.ceil((this.PING_QUEUE_MAX - _PING_QUEUE_MAX) / PING_QUEUE_SHRINK_DIVISOR);
+        if(this.PING_QUEUE_MAX > _PING_QUEUE_MIN) {
+          const nextPingDiff = Math.ceil((this.PING_QUEUE_MAX - _PING_QUEUE_MIN) / PING_QUEUE_SHRINK_DIVISOR);
 
           this.PING_QUEUE_MAX = this.PING_QUEUE_MAX - nextPingDiff;
-
+          console.error();
           console.error(`ping max diff: ${nextPingDiff}`);
           console.error(`this.PING_QUEUE_MAX: ${this.PING_QUEUE_MAX}`);
         }
+
         process.stdout.write(ERR_CHAR);
         await sleep(POST_QUEUE_CLEAR_MS);
         resolve();
@@ -169,8 +191,14 @@ export class PingQueue {
   }
 
   private async startJob() {
+    let port: number;
     const currPingJob = this.pingJobQueue.shift();
+    port = this.portFlip ? 80 : 443;
+    this.portFlip = !this.portFlip;
+    currPingJob.pingOpts.port = port;
+
     ping(currPingJob.pingOpts).then(tcpPingResult => {
+      let waitForPortPromise: Promise<void>;
       if(tcpPingResult.results?.length > 0) {
         const tcpPingResultsArr = tcpPingResult.results;
         for(let i = 0, currResults: _tcpPing.Results; currResults = tcpPingResultsArr[i], i < tcpPingResultsArr.length; ++i) {
@@ -179,13 +207,20 @@ export class PingQueue {
             && (currResults.err.message.includes('EADDRNOTAVAIL'))
           ) {
             this.doClearRunQueue = true;
+            waitForPortPromise = waitForPort(currPingJob.pingOpts.port, currPingJob.pingOpts.address);
             break;
           }
         }
       }
-      currPingJob.resolver(tcpPingResult);
-      this.dequeuePingJob(currPingJob);
+      if(waitForPortPromise === undefined) {
+        waitForPortPromise = Promise.resolve();
+      }
+      waitForPortPromise.then(() => {
+        currPingJob.resolver(tcpPingResult);
+        this.dequeuePingJob(currPingJob);
+      });
     });
+
     this.enqueueRunningPingJob(currPingJob);
   }
 
