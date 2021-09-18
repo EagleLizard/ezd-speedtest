@@ -434,7 +434,6 @@ export const ALEXA_PANAMA = [
   'www.bet365.com',
   'www.google.com.pa',
   'www.elsiglo.com.pa',
-  'www.quick-service-supplies.myshopify.com',
   'www.spotify.com',
   'www.banesco.com.pa',
   'www.reddit.com',

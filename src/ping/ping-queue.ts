@@ -4,9 +4,16 @@ import { sleep } from '../lib/sleep';
 import { Timer } from '../lib/timer';
 import { ping, waitForPort } from './ping';
 
-const _PING_QUEUE_MIN = 10;
-const _PING_QUEUE_MAX = 30;
-// const _PING_QUEUE_MAX = 31;
+const _PING_QUEUE_MIN = 5;
+// const _PING_QUEUE_MAX = 15;
+// const _PING_QUEUE_MAX = 25;
+// const _PING_QUEUE_MAX = 30;
+// const _PING_QUEUE_MAX = 50;
+// const _PING_QUEUE_MAX = 100;
+const _PING_QUEUE_MAX = 150;
+// const _PING_QUEUE_MAX = 1000;
+// const _PING_QUEUE_MAX = 1e4;
+// const _PING_QUEUE_MAX = 1e6;
 const PING_QUEUE_CHECK_INTERVAL = 1000;
 const QUEUE_CLEAR_MS = 10;
 
@@ -57,7 +64,8 @@ export class PingQueue {
     this.numQueueClears = 0;
     this.clearQueueTimeMs = 0;
 
-    const queueSizeFromTargets = numTargets / 1.5;
+    // const queueSizeFromTargets = numTargets / 1.5;
+    const queueSizeFromTargets = numTargets;
     if(queueSizeFromTargets <= _PING_QUEUE_MIN) {
       this.PING_QUEUE_MAX = _PING_QUEUE_MIN;
     } else if(queueSizeFromTargets > _PING_QUEUE_MAX) {
@@ -65,6 +73,7 @@ export class PingQueue {
     } else {
       this.PING_QUEUE_MAX = Math.round(queueSizeFromTargets);
     }
+    // this.PING_QUEUE_MAX = numTargets;
     /*
       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     */
@@ -162,12 +171,12 @@ export class PingQueue {
         while(this.runningPingJobs.length > 0) {
           await sleep(QUEUE_CLEAR_MS);
         }
-        waitForPort80Promise = waitForPort(80, 'www.google.com');
-        waitForPort443Promise = waitForPort(443, 'www.google.com');
-        await Promise.all([
-          waitForPort80Promise,
-          waitForPort443Promise,
-        ]);
+        // waitForPort80Promise = waitForPort(80, 'www.google.com');
+        // waitForPort443Promise = waitForPort(443, 'www.google.com');
+        // await Promise.all([
+        //   waitForPort80Promise,
+        //   waitForPort443Promise,
+        // ]);
 
         if(this.PING_QUEUE_MAX > _PING_QUEUE_MIN) {
           const nextPingDiff = Math.ceil((this.PING_QUEUE_MAX - _PING_QUEUE_MIN) / PING_QUEUE_SHRINK_DIVISOR);

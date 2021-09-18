@@ -29,7 +29,7 @@ export async function runPingTest(targets: string[]) {
   process.stdout.write('\n');
   for(let i = 0, currTarget: string; currTarget = targets[i], i < targets.length; ++i) {
     let runPingPromise: Promise<void>;
-    runPingPromise = runPingLoop(currTarget, async (result) => {
+    runPingPromise = runPingLoop(currTarget, 0, async (result) => {
       let doStop: boolean;
       pingResults.push(result);
       doStop = ++pingCountMap[result.address] >= MAX_PINGS;

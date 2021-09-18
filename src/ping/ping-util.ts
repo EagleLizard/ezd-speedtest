@@ -25,13 +25,15 @@ export interface TcpPingResultAggregate {
   econnrefusedCount: number;
   eaddrnotavailCount: number;
   enotfoundCount: number;
+  hasSuccesses: boolean;
 }
 
 export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpPingResultAggregate {
   let resultAggregate: TcpPingResultAggregate;
   let attempts: number, sum: number, min: number, max: number,
     avg: number, median: number, timed_out: number, failed: number,
-    econnrefusedCount: number, eaddrnotavailCount: number, enotfoundCount: number;
+    econnrefusedCount: number, eaddrnotavailCount: number, enotfoundCount: number,
+    hasSuccesses: boolean;
   let timeVals: number[];
   attempts = 0;
   sum = 0;
@@ -42,6 +44,8 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
   econnrefusedCount = 0;
   eaddrnotavailCount = 0;
   enotfoundCount = 0;
+  hasSuccesses = false;
+
   timeVals = [];
   for(let i = 0, currResult: _tcpPing.Result; currResult = tcpPingResults[i], i < tcpPingResults.length; ++i) {
     // console.log(`\n${currResult.address}`);
@@ -98,7 +102,12 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
       }
     }
   }
-  median = math.median(timeVals);
+  hasSuccesses = timeVals.length > 0;
+  median = hasSuccesses
+    ? math.median(timeVals)
+    : NaN
+  ;
+  // median = math.median(timeVals);
   avg = sum / attempts;
   resultAggregate = {
     attempts,
@@ -111,6 +120,7 @@ export function aggregateTcpPingResults(tcpPingResults: _tcpPing.Result[]): TcpP
     econnrefusedCount,
     eaddrnotavailCount,
     enotfoundCount,
+    hasSuccesses,
   };
   return resultAggregate;
 }

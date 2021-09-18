@@ -3,6 +3,7 @@ import sourceMapSupport from 'source-map-support';
 sourceMapSupport.install();
 
 import { pingMain } from './src/ping-main';
+import { netMain } from './src/net/net-main';
 
 (async () => {
   try {
@@ -13,6 +14,7 @@ import { pingMain } from './src/ping-main';
 })();
 
 async function main() {
-  await pingMain();
+  // await pingMain();
+  // console.log('pingMain() exit');
+  await netMain();
 }
-

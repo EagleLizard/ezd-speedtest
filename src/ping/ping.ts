@@ -15,13 +15,20 @@ import { getIntuitiveTimeStr } from '../lib/time-util';
 import { Timer } from '../lib/timer';
 
 // const MAX_WAIT_FOR_PORT_RETRIES = 46;
+
+// const BACKOFF_BASE = 2;
+// const MAX_WAIT_FOR_PORT_RETRIES = 13;
+// const BACKOFF_BASE = 1.5;
+// const MAX_WAIT_FOR_PORT_RETRIES = 22;
+const BACKOFF_BASE = 1.2;
 const MAX_WAIT_FOR_PORT_RETRIES = 48;
 
 // const MAX_WAIT_FOR_PORT_RETRIES = 40;
 
 const WAIT_FOR_PORT_TIMEOUT_MS = 4096;
 // const MAX_TIMEDOUT_RETRIES = MAX_WAIT_FOR_PORT_RETRIES;
-const MAX_TIMEDOUT_RETRIES = 28;
+// const MAX_TIMEDOUT_RETRIES = 28;
+const MAX_TIMEDOUT_RETRIES = Math.round(MAX_WAIT_FOR_PORT_RETRIES * 0.6);
 
 export function testConnect(port = 80, address = 'localhost', timeoutMs: number): [ () => void, Promise<void> ] {
   let hoistedForceDisconnect: () => void, connectPromise: Promise<void>;
@@ -75,8 +82,8 @@ export function testConnect(port = 80, address = 'localhost', timeoutMs: number)
 }
 
 function getBackoff(retry: number): number {
-  // let calculated = 1.2 ** retry;
-  let calculated = 1.2 ** retry;
+  let calculated = BACKOFF_BASE ** retry;
+  // let calculated = 2 ** retry;
   return Math.round(calculated);
 }
 
@@ -93,9 +100,9 @@ export async function waitForPort(port: number, address: string) {
   while(
     unavailable
     && !forcedCancel
-    && (numRetries <= MAX_WAIT_FOR_PORT_RETRIES)
   ) {
     if(timedOut && (numRetries >= MAX_TIMEDOUT_RETRIES)) {
+      unavailable = false;
       break;
     }
     try {
@@ -106,14 +113,17 @@ export async function waitForPort(port: number, address: string) {
       if(e?.timeout) {
         timedOut = true;
       }
+      numRetries++;
       waitForMs = getBackoff(numRetries);
       await sleep(waitForMs);
-      numRetries++;
     }
     currentRunningMs = timer.current();
     if(currentRunningMs > 10e3) {
       // forcedCancel = true;
       // cancelCb();
+    }
+    if(numRetries > MAX_WAIT_FOR_PORT_RETRIES) {
+      break;
     }
   }
   const deltaMs = timer.stop();
@@ -122,7 +132,7 @@ export async function waitForPort(port: number, address: string) {
     || (timedOut)
     // || (!unavailable && (deltaMs > 1e3) && (numRetries > 1))
     || (unavailable)
-    || (deltaMs > 20e3)
+    // || (deltaMs > 20e3)
   ) {
     console.error(`\n${address}:${port}`);
     console.error(`numTries: ${numRetries}`);

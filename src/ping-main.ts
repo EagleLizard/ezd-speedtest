@@ -8,17 +8,20 @@ import {
 import { pingForMsHandler } from './ping/ping-for';
 import { TcpPingResultAggregate } from './ping/ping-util';
 import { pingQueueTestHandler } from './ping/ping-queue';
+import { pingBlastHandler } from './ping/ping-blast';
 
 enum PING_MODULES {
   RUN_PING_TEST = 'RUN_PING_TEST',
   PING_FOR_MS = 'PING_FOR_MS',
   PING_QUEUE = 'PING_QUEUE',
+  PING_BLAST = 'PING_BLAST',
 }
 
 let PING_MODULE: PING_MODULES;
 
 PING_MODULE = PING_MODULES.PING_FOR_MS;
 // PING_MODULE = PING_MODULES.PING_QUEUE;
+// PING_MODULE = PING_MODULES.PING_BLAST;
 
 export async function pingMain() {
   switch(PING_MODULE) {
@@ -30,6 +33,9 @@ export async function pingMain() {
       break;
     case PING_MODULES.PING_QUEUE:
       await pingQueueTestHandler(PING_TARGETS, 7);
+      break;
+    case PING_MODULES.PING_BLAST:
+      await pingBlastHandler(PING_TARGETS);
       break;
   }
 

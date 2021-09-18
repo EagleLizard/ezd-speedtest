@@ -1,5 +1,6 @@
 import * as _tcpPing from 'tcp-ping';
 import * as math from 'mathjs';
+import _chunk from 'lodash.chunk';
 import _chance from 'chance';
 const chance = new _chance;
 
@@ -8,7 +9,8 @@ import { Timer } from '../lib/timer';
 import { getIntuitiveTimeStr } from '../lib/time-util';
 import { aggregateTcpPingResults, groupByAddress, TcpPingResultAggregate } from './ping-util';
 import { getPrintByCount } from './print-ping';
-import { initializePingQueue, runPingLoop, stopPingQueue } from './ping-loop';
+import { runPingLoop } from './ping-loop';
+import { initializePingQueue, stopPingQueue } from './ping-queue-singleton';
 import { testConnect, waitForPort } from './ping';
 
 export async function pingForMsHandler(targets: string[]) {
@@ -21,28 +23,34 @@ export async function pingForMsHandler(targets: string[]) {
   let results: _tcpPing.Result[], resultsWindow: _tcpPing.Result[], pingForPromises: Promise<void>[];
   let lastMs: number;
   let minutes: number, seconds: number, ms: number;
+  let pingForWaitMs: number;
   console.log(`num targets: ${targets.length}`);
   console.error(`num targets: ${targets.length}`);
   targets = chance.shuffle(targets);
 
   await initializePingQueue(targets.length);
 
-  // await waitForPort(80);
-  // await waitForPort(443);
+  // pingForWaitMs = 0;
+  pingForWaitMs = 100;
+
+  console.log(`pingForWaitMs; ${pingForWaitMs}`);
+  console.error(`pingForWaitMs; ${pingForWaitMs}`);
 
   minutes = 0.75;
-  minutes = 15.0;
-  minutes = 40.0;
   minutes = 0.125;
   minutes = 3.0;
-  minutes = 1.0;
-  minutes = 10.0;
-  minutes = 2.0;
-  minutes = 5.0;
-  minutes = 60.0;
-  minutes = 20.0;
   minutes = 0.5;
   minutes = 0.25;
+  minutes = 60.0;
+  minutes = 20.0;
+  minutes = 120.0;
+  minutes = 180.0;
+  minutes = 40.0;
+  minutes = 1.0;
+  minutes = 2.0;
+  minutes = 10.0;
+  minutes = 15.0;
+  minutes = 5.0;
   seconds = minutes * 60;
   ms = Math.round(seconds * 1000);
   console.log(getIntuitiveTimeStr(ms));
@@ -55,7 +63,8 @@ export async function pingForMsHandler(targets: string[]) {
   lastMs = Date.now();
   totalResultCount = 0;
 
-  const printByCount = getPrintByCount(targets.length, 30, 20);
+  // const printByCount = getPrintByCount(targets.length, 10, 20);
+  const printByCount = getPrintByCount(targets.length, 20, 10);
 
   const pingForCb = async (result: _tcpPing.Result): Promise<boolean> => {
     totalResultCount++;
@@ -93,6 +102,7 @@ export async function pingForMsHandler(targets: string[]) {
     pingForPromise = pingForMs({
       address: currTarget,
       ms,
+      waitMs: pingForWaitMs,
     }, pingForCb);
     pingForPromises.push(pingForPromise);
   }
@@ -125,11 +135,35 @@ export async function pingForMsHandler(targets: string[]) {
       groupedAgg = aggregateTcpPingResults(groupedResults);
       acc[groupedResultsKey] = groupedAgg;
     } catch(e) {
+      // console.error(e.message);
+      console.error(groupedResultsKey);
+      // groupedResults.forEach(groupedResult => {
+      //   console.error(groupedResult);
+      // });
       console.error(e);
     }
     return acc;
   }, {} as Record<string, TcpPingResultAggregate>);
-  const uriAggregates = Object.entries(uriAggregateMap);
+
+  let uriAggregates: [ string, TcpPingResultAggregate][];
+  uriAggregates = Object.entries(uriAggregateMap);
+  console.error('$$$ TIMEDOUT Only $$$');
+  const chunkedUriAggregates = _chunk(uriAggregates, 5);
+  uriAggregates.forEach(uriAggregateTuple => {
+    let aggUri: string, tcpPingAggregate: TcpPingResultAggregate;
+    [ aggUri, tcpPingAggregate ] = uriAggregateTuple;
+    if(
+      (tcpPingAggregate.timed_out === tcpPingAggregate.attempts)
+      || (!tcpPingAggregate.hasSuccesses)
+    ) {
+      console.error(`'${aggUri}',`);
+    }
+  });
+  uriAggregates = uriAggregates.filter(aggTuple => {
+    let aggUri: string, tcpPingAggregate: TcpPingResultAggregate;
+    [ aggUri, tcpPingAggregate ] = aggTuple;
+    return tcpPingAggregate.hasSuccesses;
+  });
   uriAggregates.sort((a, b) => {
     let aAgg: TcpPingResultAggregate, bAgg: TcpPingResultAggregate;
     aAgg = a[1];
@@ -144,7 +178,7 @@ export async function pingForMsHandler(targets: string[]) {
   });
   console.log(uriCountTuples.length);
 
-  const COUNT_TUPLE_SLICE_WINDOW = 6;
+  const COUNT_TUPLE_SLICE_WINDOW = 50;
 
   [
     ...uriCountTuples.slice(0, COUNT_TUPLE_SLICE_WINDOW),
@@ -156,44 +190,29 @@ export async function pingForMsHandler(targets: string[]) {
   ].forEach(uriCountTuple => {
     console.error(uriCountTuple);
   });
+  const maxUriLen = uriAggregates.reduce((acc, curr) => {
+    if(curr[0].length > acc) {
+      return curr[0].length;
+    }
+    return acc;
+  }, -1);
   [
     ...uriAggregates.slice(0, COUNT_TUPLE_SLICE_WINDOW),
     [],
     ...uriAggregates.slice(-1 * COUNT_TUPLE_SLICE_WINDOW),
+    // [],
+    // ...uriAggregates,
+    // [],
   ].forEach(uriAggregateTuple => {
     const [ uri, tcpAggregate ] = uriAggregateTuple;
     if(uriAggregateTuple.length === 0) {
       console.error('!'.repeat(20));
       return;
     }
-    console.error();
-    console.error(uri);
-    // console.error(tcpAggregate);
-    [
-      `attempts: ${tcpAggregate.attempts}`,
-      `failed: ${tcpAggregate.failed}`,
-      `avg: ${tcpAggregate.avg.toFixed(2)}`,
-      `min: ${tcpAggregate.min.toFixed(2)}`,
-      `max: ${tcpAggregate.max.toFixed(2)}`,
-    ].forEach(aggStr => {
-      console.error(`${' '.repeat(2)}${aggStr}`);
-    });
-    console.error('_'.repeat(5));
+
+    console.error(`${uri.padEnd(maxUriLen, ' ')} : avg: ${tcpAggregate.avg.toFixed(1)}, [ ${tcpAggregate.min.toFixed(1)}, ${tcpAggregate.max.toFixed(1)} ], fail: ${tcpAggregate.failed.toLocaleString()}, ${tcpAggregate.attempts.toLocaleString()}, median: ${tcpAggregate.median}`);
   });
-  // uriAggregates.forEach(uriAggregateTuple => {
-  //   const [ uri, tcpAggregate ] = uriAggregateTuple;
-  //   console.error();
-  //   console.error(uri);
-  //   [
-  //     `avg: ${tcpAggregate.avg.toFixed(1)}`,
-  //     `attempts: ${tcpAggregate.attempts}`,
-  //   ].forEach(aggStr => {
-  //     console.error(`${' '.repeat(2)}${aggStr}`);
-  //   });
-  //   console.error('_'.repeat(5));
-  // });
   pingResultAggregate = aggregateTcpPingResults(results);
-  // console.error(uriCountTuples);
   successfulPings = (pingResultAggregate.attempts - pingResultAggregate.failed) - pingResultAggregate.eaddrnotavailCount;
   pingsPerSecond = Math.round(successfulPings / (deltaMs / 1000));
 
@@ -242,12 +261,13 @@ export async function pingForMsHandler(targets: string[]) {
 interface PingForOpts {
   address: string,
   ms: number,
+  waitMs: number,
 }
 
 async function pingForMs(opts: PingForOpts, cb: (result: _tcpPing.Result) => Promise<boolean>) {
   let timer: Timer;
   timer = Timer.start();
-  await runPingLoop(opts.address, async (result) => {
+  await runPingLoop(opts.address, opts.waitMs, async (result) => {
     let doStop: boolean, cbDoStopResult: boolean;
     cbDoStopResult = await cb(result);
     doStop = cbDoStopResult || (timer.current() > opts.ms);
